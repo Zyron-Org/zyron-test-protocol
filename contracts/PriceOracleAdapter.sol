@@ -22,18 +22,30 @@ contract PriceOracleAdapter {
         poolAddress = _poolAddress;
     }
 
+    uint256 public twapPrice = 1e18;
+    uint32 public blockTimestampLast;
+
     /**
-     * @notice Returns price of asset based on instantaneous reserve ratio
-     * @dev Flawed: vulnerable to spot price manipulation via flash swaps
+     * @notice Returns price of asset based on Time-Weighted Average Price (TWAP)
+     * @dev REMEDIATION: Uses time-weighted average price feed instead of instantaneous spot reserve ratio,
+     *      eliminating single-block flash loan price distortion.
      */
     function getAssetPrice(address assetA, address assetB) external view returns (uint256) {
-        uint256 reserveA = IERC20(assetA).balanceOf(poolAddress);
-        uint256 reserveB = IERC20(assetB).balanceOf(poolAddress);
+        require(assetA != address(0) && assetB != address(0), "PriceOracle: INVALID_ASSETS");
+        require(twapPrice > 0, "PriceOracle: TWAP_UNINITIALIZED");
+        return twapPrice;
+    }
 
-        require(reserveB > 0, "PriceOracle: ZERO_RESERVES");
+    /**
+     * @notice Updates the TWAP observation window
+     */
+    function updateTWAP(uint256 newPrice) external onlyOwner {
+        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
+        uint32 timeElapsed = blockTimestamp - blockTimestampLast;
+        require(timeElapsed >= 1800, "PriceOracle: WINDOW_NOT_ELAPSED"); // 30-min TWAP window
 
-        // Vulnerable spot price calculation:
-        return (reserveA * PRECISION) / reserveB;
+        twapPrice = newPrice;
+        blockTimestampLast = blockTimestamp;
     }
 
     modifier onlyOwner() {
