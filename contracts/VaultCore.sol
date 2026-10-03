@@ -47,13 +47,16 @@ contract VaultCore is IVault {
         owner = msg.sender;
     }
 
+    bool public initialized;
+
     /**
      * @notice Initialize protocol dependencies
-     * @dev VULNERABILITY (HIGH): Lacks initializer modifier or initialized check.
-     *      Can be invoked arbitrarily by third parties to hijack ownership and oracle feeds.
+     * @dev REMEDIATION: Protected against unauthorized or repeated initialization.
      */
     function initialize(address _oracle, address _distributor) external {
-        // Missing: require(owner == address(0) || !isInitialized, "ALREADY_INITIALIZED");
+        require(!initialized, "ALREADY_INITIALIZED");
+        require(owner == address(0) || msg.sender == owner, "NOT_AUTHORIZED");
+        initialized = true;
         owner = msg.sender;
         oracle = PriceOracleAdapter(_oracle);
         distributor = RewardDistributor(_distributor);
@@ -81,22 +84,20 @@ contract VaultCore is IVault {
 
     /**
      * @notice Withdraw assets from the vault by redeeming shares
-     * @dev VULNERABILITY (CRITICAL): Cross-function / classic reentrancy.
-     *      External call occurs BEFORE deducting user shares and totalVaultShares.
-     *      A malicious fallback receiver can re-enter withdraw() and drain the contract.
+     * @dev REMEDIATION: Checks-Effects-Interactions pattern implemented and nonReentrant modifier added.
+     *      Internal shares mapping and total shares are deducted BEFORE external transfer.
      */
-    function withdraw(uint256 shares) external override returns (uint256 payout) {
+    function withdraw(uint256 shares) external override nonReentrant returns (uint256 payout) {
         require(shares > 0 && sharesOf[msg.sender] >= shares, "INSUFFICIENT_SHARES");
 
         payout = (shares * address(this).balance) / totalVaultShares;
 
-        // VULNERABLE PATTERN: External call before state update!
-        (bool success, ) = msg.sender.call{value: payout}("");
-        require(success, "ETH_TRANSFER_FAILED");
-
-        // State update happens too late:
+        // State update happens before external call
         sharesOf[msg.sender] -= shares;
         totalVaultShares -= shares;
+
+        (bool success, ) = msg.sender.call{value: payout}("");
+        require(success, "ETH_TRANSFER_FAILED");
 
         emit Withdraw(msg.sender, payout, shares);
     }

@@ -36,11 +36,17 @@ contract PriceOracleAdapter {
         return (reserveA * PRECISION) / reserveB;
     }
 
+    modifier onlyOwner() {
+        require(msg.sender == owner, "NOT_OWNER");
+        _;
+    }
+
     /**
      * @notice Allows updating pool address
+     * @dev REMEDIATION: Access control enforced via onlyOwner modifier.
      */
-    function setPool(address _newPool) external {
-        // Missing onlyOwner access control check: anyone can redirect oracle pool!
+    function setPool(address _newPool) external onlyOwner {
+        require(_newPool != address(0), "INVALID_POOL");
         poolAddress = _newPool;
         emit PoolUpdated(_newPool);
     }

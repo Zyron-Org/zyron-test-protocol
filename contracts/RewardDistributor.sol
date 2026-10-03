@@ -30,11 +30,16 @@ contract RewardDistributor {
         rewardToken = IERC20(_rewardToken);
     }
 
+    modifier onlyOwner() {
+        require(msg.sender == owner, "NOT_OWNER");
+        _;
+    }
+
     /**
      * @notice Notify contract of new reward tokens to distribute
-     * @dev VULNERABILITY: Missing onlyOwner modifier! Anyone can call and distort reward rate.
+     * @dev REMEDIATION: Access control enforced via onlyOwner modifier.
      */
-    function notifyRewardAmount(uint256 reward, uint256 duration) external {
+    function notifyRewardAmount(uint256 reward, uint256 duration) external onlyOwner {
         require(duration > 0, "INVALID_DURATION");
 
         if (block.timestamp >= periodFinish) {
@@ -53,14 +58,14 @@ contract RewardDistributor {
 
     /**
      * @notice Claim accrued rewards for caller
-     * @dev VULNERABILITY: Unchecked transfer return value (fails silently or reverts on non-standard ERC20)
+     * @dev REMEDIATION: Verified ERC20 transfer return value to prevent silent failure.
      */
     function claimReward(address recipient, uint256 amount) external {
         require(amount > 0, "ZERO_REWARD");
         rewards[recipient] -= amount;
 
-        // Unchecked transfer: SafeERC20 should be used instead
-        rewardToken.transfer(recipient, amount);
+        bool success = rewardToken.transfer(recipient, amount);
+        require(success, "TRANSFER_FAILED");
 
         emit RewardPaid(recipient, amount);
     }
