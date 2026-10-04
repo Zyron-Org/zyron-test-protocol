@@ -53,11 +53,9 @@ contract VaultCore is IVault {
      * @notice Initialize protocol dependencies
      * @dev REMEDIATION: Protected against unauthorized or repeated initialization.
      */
-    function initialize(address _oracle, address _distributor) external {
+    function initialize(address _oracle, address _distributor) external onlyOwner {
         require(!initialized, "ALREADY_INITIALIZED");
-        require(owner == address(0) || msg.sender == owner, "NOT_AUTHORIZED");
         initialized = true;
-        owner = msg.sender;
         oracle = PriceOracleAdapter(_oracle);
         distributor = RewardDistributor(_distributor);
     }

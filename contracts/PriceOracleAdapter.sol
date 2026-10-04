@@ -23,7 +23,7 @@ contract PriceOracleAdapter {
     }
 
     uint256 public twapPrice = 1e18;
-    uint32 public blockTimestampLast;
+    uint256 public blockTimestampLast;
 
     /**
      * @notice Returns price of asset based on Time-Weighted Average Price (TWAP)
@@ -40,12 +40,10 @@ contract PriceOracleAdapter {
      * @notice Updates the TWAP observation window
      */
     function updateTWAP(uint256 newPrice) external onlyOwner {
-        uint32 blockTimestamp = uint32(block.timestamp % 2**32);
-        uint32 timeElapsed = blockTimestamp - blockTimestampLast;
-        require(timeElapsed >= 1800, "PriceOracle: WINDOW_NOT_ELAPSED"); // 30-min TWAP window
+        require(block.timestamp >= blockTimestampLast + 1800, "PriceOracle: WINDOW_NOT_ELAPSED"); // 30-min TWAP window
 
         twapPrice = newPrice;
-        blockTimestampLast = blockTimestamp;
+        blockTimestampLast = block.timestamp;
     }
 
     modifier onlyOwner() {
